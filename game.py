@@ -92,6 +92,8 @@ class Game():
             player.end_game(player_won_num)
 
     def game_loop(self):
+        screen.fill((0,0,0))
+
         if self.checking_phase() == 1:
             self.place_ship_phase()
         elif self.checking_phase() == 3:
@@ -103,15 +105,17 @@ class Game():
 
     def send_info_to_attacked_player(self, picked_square_in_width, picked_square_in_height):
         attacked_player_id = not self.active_player
-        self.players[attacked_player_id].update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+        info = self.players[attacked_player_id].update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+        self.players[self.active_player].update_map_from_attack(info)
 
     def make_action(self):
         if self.checking_phase() == 1:
             self.players[self.active_player].place_ship()
         elif self.checking_phase() == 3:
             attack_cords = self.place_attack(self.active_player)
-            self.send_info_to_attacked_player(attack_cords[0], attack_cords[1])
-            self.change_turns()
+            if attack_cords != [-1, -1]:
+                self.send_info_to_attacked_player(attack_cords[0], attack_cords[1])
+                self.change_turns()
         elif self.checking_phase() == 4:
             self.end_game()
 
@@ -158,7 +162,10 @@ class Player():
         self.board.draw_all(self.picked_square_in_width, self.picked_square_in_height)
 
     def update_map_from_being_attacked(self, picked_square_in_width, picked_square_in_height):
-        self.board.update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+        return self.board.update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+
+    def update_map_from_attack(self, info):
+        self.board.update_map_from_attack(info)
 
     def end_game(self, player_won_num):
         self.board.end_game(player_won_num)
@@ -201,6 +208,8 @@ class Board():
 
     def end_game(self, player_won_num):
         self.player_won_num = player_won_num
+        self.game_phase = 4
+        self.draw_end_screen()
 
 
     def draw_board(self):
@@ -263,6 +272,20 @@ class Board():
                     if ship[0] == square_num_width and ship[1] == square_num_height:
                         self.draw_action(missedShot, square_num_width, square_num_height)
 
+    def draw_missied_self_hits(self):
+        for ship in self.shots_missed_position:
+            for square_num_width in range(self.dimension):
+                for square_num_height in range(self.dimension):
+                    if ship[0] == square_num_width and ship[1] == square_num_height:
+                        self.draw_action_on_enemy_board(missedShot, square_num_width, square_num_height)
+
+    def draw_successfull_hits(self):
+        for ship in self.shots_hit_position:
+            for square_num_width in range(self.dimension):
+                for square_num_height in range(self.dimension):
+                    if ship[0] == square_num_width and ship[1] == square_num_height:
+                        self.draw_action_on_enemy_board(shipKilled, square_num_width, square_num_height)
+
     def draw_border(self, sq_width_num, sq_height_num, valid):
 
         color = (255, 0, 0) #Red
@@ -296,12 +319,28 @@ class Board():
 
         screen.blit(img, (square_x_pos,square_y_pos))
 
+
     def draw_action(self, img, sq_width_num, sq_height_num):
 
         square_num_width = sq_width_num
         square_num_height = sq_height_num
 
         square_x_pos = 50 + ( (WIDTH / 2) * self.player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width))
+        square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height))
+
+        square_width = self.square_width + (2 * self.border_size)
+        square_height = self.square_height + (2 * self.border_size)
+
+        screen.blit(img, (square_x_pos,square_y_pos))
+
+    def draw_action_on_enemy_board(self, img, sq_width_num, sq_height_num):
+
+        enemy_player_num = not self.player_num
+
+        square_num_width = sq_width_num
+        square_num_height = sq_height_num
+
+        square_x_pos = 50 + ( (WIDTH / 2) * enemy_player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width))
         square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height))
 
         square_width = self.square_width + (2 * self.border_size)
@@ -339,6 +378,17 @@ class Board():
         screen.blit(text1, textRect1)
         screen.blit(text2, textRect2)
 
+    def draw_end_screen(self):
+        self.draw_board()
+        self.draw_ships()
+        self.draw_killed_ships()
+        self.draw_missed_enemy_hits()
+        self.draw_main_text("KONIEC GRY")
+        if self.player_won_num == 0:
+            self.draw_all_players_info_text("WYGRANY", "PRZEGRANY")
+        elif self.player_won_num == 1:
+            self.draw_all_players_info_text("PRZEGRANY", "WYGRANY")
+
     def draw_all(self, picked_square_in_width, picked_square_in_height):
         if self.game_phase == 1:
             self.draw_border(picked_square_in_width, picked_square_in_height, self.check_if_move_is_valid(picked_square_in_width, picked_square_in_height))
@@ -359,6 +409,8 @@ class Board():
             self.draw_enemy_boarder(picked_square_in_width, picked_square_in_height, self.check_if_attack_is_valid(picked_square_in_width, picked_square_in_height))
             self.draw_board()
             self.draw_enemy_board()
+            self.draw_missied_self_hits()
+            self.draw_successfull_hits()
             self.draw_ships()
             self.draw_killed_ships()
             self.draw_missed_enemy_hits()
@@ -366,20 +418,13 @@ class Board():
             self.draw_main_text("ATAK")
 
         elif self.game_phase == 4:
-            self.draw_board()
-            self.draw_enemy_board()
-            self.draw_ships()
-            self.draw_killed_ships()
-            self.draw_missed_enemy_hits()
-            self.draw_main_text("KONIEC GRY")
-            if self.player_won_num == 0:
-                self.draw_all_players_info_text("WYGRANY", "PRZEGRANY")
-            elif self.player_won_num == 1:
-                self.draw_all_players_info_text("PRZEGRANY", "WYGRANY")
+            self.draw_end_screen()
 
     def place_attack(self, picked_square_in_width, picked_square_in_height):
         if self.check_if_attack_is_valid(picked_square_in_width, picked_square_in_height):
             return [picked_square_in_width, picked_square_in_height]
+        else:
+            return [-1, -1]
 
     def place_ship(self, picked_square_in_width, picked_square_in_height):
         if self.check_if_move_is_valid(picked_square_in_width, picked_square_in_height):
@@ -399,13 +444,25 @@ class Board():
                     self.game_phase = 2
 
     def update_map_from_being_attacked(self, picked_square_in_width, picked_square_in_height):
+        ship_hit = 0
         if [picked_square_in_width, picked_square_in_height] in self.ships_position:
             self.enemy_shoots_hit.append([picked_square_in_width, picked_square_in_height])
+            ship_hit = 1
         else:
             self.enemy_shoots_missed.append([picked_square_in_width, picked_square_in_height])
 
         if len(Diff(self.enemy_shoots_hit, self.ships_position)) == 0:
             self.game_phase = 4
+
+        return [picked_square_in_width, picked_square_in_height, ship_hit]
+
+    def update_map_from_attack(self, info):
+        #Hit
+        if info[2] == 1:
+            self.shots_hit_position.append([info[0], info[1]])
+        #Miss
+        elif info[2] == 0:
+            self.shots_missed_position.append([info[0], info[1]])
 
 
     def check_if_attack_is_valid(self, picked_square_in_width, picked_square_in_height):
@@ -541,8 +598,6 @@ game.start_conf()
 
 
 while not done:
-
-    screen.fill((0,0,0))
 
     active_player = game.players[game.active_player]
     game.game_loop()
