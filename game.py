@@ -4,9 +4,7 @@ import pygame
 WIDTH = 750
 HEIGHT = 390
 
-def Diff(li1, li2):
-    li_dif = [i for i in li1 + li2 if i not in li1 or i not in li2]
-    return li_dif
+
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -103,9 +101,9 @@ class Game():
 
         self.draw_boards()
 
-    def send_info_to_attacked_player(self, picked_square_in_width, picked_square_in_height):
+    def send_info_to_attacked_player(self, width_position, height_position):
         attacked_player_id = not self.active_player
-        info = self.players[attacked_player_id].update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+        info = self.players[attacked_player_id].update_map_from_being_attacked width_position, height_position)
         self.players[self.active_player].update_map_from_attack(info)
 
     def make_action(self):
@@ -118,6 +116,32 @@ class Game():
                 self.change_turns()
         elif self.checking_phase() == 4:
             self.end_game()
+
+    def run(self):
+        run = True
+
+        while run:
+            self.game_loop()
+            active_player = self.players[self.active_player]
+
+            for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        done = True
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_DOWN:
+                            active_player.change_picked_square(0, 1)
+                        elif event.key == pygame.K_LEFT:
+                            active_player.change_picked_square(-1, 0)
+                        elif event.key == pygame.K_UP:
+                            active_player.change_picked_square(0, -1)
+                        elif event.key == pygame.K_RIGHT:
+                            active_player.change_picked_square(1, 0)
+                        elif event.key == pygame.K_RETURN:
+                            game.make_action()
+                        elif event.key == pygame.K_SPACE:
+                            game.change_turns()
+
+                    pygame.display.update()
 
 
 ########### PLAYER
@@ -135,34 +159,35 @@ class Player():
     def __init__(self, player_num):
         self.player_num = player_num
         self.board = Board(player_num)
-        self.picked_square_in_width = 0
-        self.picked_square_in_height = 0
+        self.width_position = 0
+        self.height_position = 0
+        self.position = [self.width_position, self.height_position]
         self.is_active = 0
 
     def change_picked_square(self, width, height):
-        if self.picked_square_in_width + width >= 0 and self.picked_square_in_width + width < self.board.dimension:
-            self.picked_square_in_width = self.picked_square_in_width + width
-        if self.picked_square_in_height + height >= 0 and self.picked_square_in_height + height < self.board.dimension:
-            self.picked_square_in_height = self.picked_square_in_height + height
+        if self.width_position + width >= 0 and self.width_position + width < self.board.dimension:
+            self.width_position = self.width_position + width
+        if self.height_position + height >= 0 and self.height_position + height < self.board.dimension:
+            self.height_position = self.height_position + height
         self.draw_all()
 
     def draw_cross(self):
-        self.board.draw_action(crossImg ,self.picked_square_in_width, self.picked_square_in_height)
+        self.board.draw_action(crossImg ,self.width_position, self.height_position)
 
     def draw_ship(self):
-        self.board.draw_action(shipImg, self.picked_square_in_width, self.picked_square_in_height)
+        self.board.draw_action(shipImg, self.width_position, self.height_position)
 
     def place_ship(self):
-        self.board.place_ship(self.picked_square_in_width, self.picked_square_in_height)
+        self.board.place_ship(self.width_position, self.height_position)
 
     def place_attack(self):
-        return self.board.place_attack(self.picked_square_in_width, self.picked_square_in_height)
+        return self.board.place_attack(self.width_position, self.height_position)
 
     def draw_all(self):
-        self.board.draw_all(self.picked_square_in_width, self.picked_square_in_height)
+        self.board.draw_all(self.width_position, self.height_position)
 
-    def update_map_from_being_attacked(self, picked_square_in_width, picked_square_in_height):
-        return self.board.update_map_from_being_attacked(picked_square_in_width, picked_square_in_height)
+    def update_map_from_being_attacked(self, width_position, height_position):
+        return self.board.update_map_from_being_attacked(width_position, height_position)
 
     def update_map_from_attack(self, info):
         self.board.update_map_from_attack(info)
@@ -186,6 +211,7 @@ class Board():
         self.border_size = 3
         self.player_num = player_num
         self.padding_top = 60
+        self.player_position = []
 
         # Ships info
 
@@ -196,7 +222,7 @@ class Board():
         self.placed_ships = 0
         self.placed_ships_figure = 0
         self.is_ship_being_placed = False
-        self.ship_sizes = [ 1, 1]
+        self.ship_sizes = [ 2, 1, 1]
         self.enemy_shoots_missed = []
         self.enemy_shoots_hit = []
 
@@ -212,81 +238,26 @@ class Board():
         self.draw_end_screen()
 
 
-    def draw_board(self):
+    def draw_board(self, player_num):
         for square_num_width in range(self.dimension):
             for square_num_height in range(self.dimension):
 
-                square_x_pos = 50 + ( (WIDTH / 2) * self.player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width))
+                which_board = self.player_num
+
+                if which_one == 1:
+                    which_board = not self.player_num
+
+                square_x_pos = 50 + ( (WIDTH / 2) * which_board ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width))
                 square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height))
 
                 pygame.draw.rect(screen, (255, 255, 255), (square_x_pos, square_y_pos, self.square_width, self.square_height))
 
-    def draw_enemy_board(self):
-        for square_num_width in range(self.dimension):
-            for square_num_height in range(self.dimension):
+    def draw_border(self, sq_width_num, sq_height_num, valid, which_one):
 
-                enemy_player_num = not self.player_num
+        which_board = self.player_num
 
-                square_x_pos = 50 + ( (WIDTH / 2) * enemy_player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width))
-                square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height))
-
-                pygame.draw.rect(screen, (255, 255, 255), (square_x_pos, square_y_pos, self.square_width, self.square_height))
-
-    def draw_enemy_boarder(self, sq_width_num, sq_height_num, valid):
-        color = (255, 0, 0) #Red
-
-        if valid is True:
-            color = (0, 255, 0) #Green
-
-        square_num_width = sq_width_num
-        square_num_height = sq_height_num
-
-        enemy_player_num = not self.player_num
-
-        square_x_pos = 50 + ( (WIDTH / 2) * enemy_player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width)) - self.border_size
-        square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height)) - self.border_size
-
-        square_width = self.square_width + (2 * self.border_size)
-        square_height = self.square_height + (2 * self.border_size)
-
-        pygame.draw.rect(screen, color, (square_x_pos, square_y_pos, square_width, square_height))
-
-    def draw_ships(self):
-        for ship in self.ships_position:
-            for square_num_width in range(self.dimension):
-                for square_num_height in range(self.dimension):
-                    if ship[0] == square_num_width and ship[1] == square_num_height:
-                        self.draw_action(shipImg, square_num_width, square_num_height)
-
-    def draw_killed_ships(self):
-        for ship in self.enemy_shoots_hit:
-            for square_num_width in range(self.dimension):
-                for square_num_height in range(self.dimension):
-                    if ship[0] == square_num_width and ship[1] == square_num_height:
-                        self.draw_action(shipKilled, square_num_width, square_num_height)
-
-    def draw_missed_enemy_hits(self):
-        for ship in self.enemy_shoots_missed:
-            for square_num_width in range(self.dimension):
-                for square_num_height in range(self.dimension):
-                    if ship[0] == square_num_width and ship[1] == square_num_height:
-                        self.draw_action(missedShot, square_num_width, square_num_height)
-
-    def draw_missied_self_hits(self):
-        for ship in self.shots_missed_position:
-            for square_num_width in range(self.dimension):
-                for square_num_height in range(self.dimension):
-                    if ship[0] == square_num_width and ship[1] == square_num_height:
-                        self.draw_action_on_enemy_board(missedShot, square_num_width, square_num_height)
-
-    def draw_successfull_hits(self):
-        for ship in self.shots_hit_position:
-            for square_num_width in range(self.dimension):
-                for square_num_height in range(self.dimension):
-                    if ship[0] == square_num_width and ship[1] == square_num_height:
-                        self.draw_action_on_enemy_board(shipKilled, square_num_width, square_num_height)
-
-    def draw_border(self, sq_width_num, sq_height_num, valid):
+        if which_one == 1:
+            which_board = not self.player_num
 
         color = (255, 0, 0) #Red
 
@@ -296,13 +267,20 @@ class Board():
         square_num_width = sq_width_num
         square_num_height = sq_height_num
 
-        square_x_pos = 50 + ( (WIDTH / 2) * self.player_num ) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width)) - self.border_size
+        square_x_pos = 50 + ( (WIDTH / 2) * which_board) + (22 * (square_num_width)) + (self.spacing_between * (square_num_width)) - self.border_size
         square_y_pos = self.padding_top + (22 * (square_num_height)) + (self.spacing_between * (square_num_height)) - self.border_size
 
         square_width = self.square_width + (2 * self.border_size)
         square_height = self.square_height + (2 * self.border_size)
 
         pygame.draw.rect(screen, color, (square_x_pos, square_y_pos, square_width, square_height))
+
+    def draw_icons_on_map(self, img, which_type_array):
+        for item in which_type_array:
+            for square_num_width in range(self.dimension):
+                for square_num_height in range(self.dimension):
+                    if item[0] == square_num_width and item[1] == square_num_height:
+                        self.draw_action(img, square_num_width, square_num_height)
 
     def draw_action_attack(self, img, sq_width_num, sq_height_num):
 
@@ -389,47 +367,47 @@ class Board():
         elif self.player_won_num == 1:
             self.draw_all_players_info_text("PRZEGRANY", "WYGRANY")
 
-    def draw_all(self, picked_square_in_width, picked_square_in_height):
+    def draw_all(self, width_position, height_position):
         if self.game_phase == 1:
-            self.draw_border(picked_square_in_width, picked_square_in_height, self.check_if_move_is_valid(picked_square_in_width, picked_square_in_height))
-            self.draw_board()
-            self.draw_ships()
-            self.draw_action(shipImg, picked_square_in_width, picked_square_in_height)
+            self.draw_border width_position, height_position, self.check_if_move_is_valid width_position, height_position), 0)
+            self.draw_board(0)
+            self.draw_icons_on_map(shipImg, self.ships_position)
+            self.draw_action(shipImg, width_position, height_position)
             self.draw_main_text("UŁÓŻ STATKI")
             self.draw_player_info_text(str(self.ship_sizes[self.placed_ships_figure]) + " STATKA")
 
         elif self.game_phase == 2:
-            self.draw_border(picked_square_in_width, picked_square_in_height, self.check_if_move_is_valid(picked_square_in_width, picked_square_in_height))
-            self.draw_board()
-            self.draw_ships()
-            self.draw_action(crossImg, picked_square_in_width, picked_square_in_height)
+            self.draw_border width_position, height_position, self.check_if_move_is_valid width_position, height_position), 0)
+            self.draw_board(0)
+            self.draw_icons_on_map(shipImg, self.ships_position)
+            self.draw_action(crossImg, width_position, height_position)
             self.draw_main_text("ZACZEKAJ NA DRUGIEGO GRACZA")
 
         elif self.game_phase == 3:
-            self.draw_enemy_boarder(picked_square_in_width, picked_square_in_height, self.check_if_attack_is_valid(picked_square_in_width, picked_square_in_height))
-            self.draw_board()
-            self.draw_enemy_board()
-            self.draw_missied_self_hits()
-            self.draw_successfull_hits()
-            self.draw_ships()
-            self.draw_killed_ships()
-            self.draw_missed_enemy_hits()
-            self.draw_action_attack(crossImg, picked_square_in_width, picked_square_in_height)
+            self.draw_border width_position, height_position, self.check_if_attack_is_valid width_position, height_position), 1)
+            self.draw_board(0)
+            self.draw_board(1)
+            self.draw_icons_on_map(missedShot, self.shots_missed_position)
+            self.draw_icons_on_map(shipKilled, self.shots_hit_position)
+            self.draw_icons_on_map(shipImg, self.ships_position)
+            self.draw_icons_on_map(shipKilled, self.enemy_shoots_hit)
+            self.draw_icons_on_map(missedShot, self.enemy_shoots_missed)
+            self.draw_action_attack(crossImg, width_position, height_position)
             self.draw_main_text("ATAK")
 
         elif self.game_phase == 4:
             self.draw_end_screen()
 
-    def place_attack(self, picked_square_in_width, picked_square_in_height):
-        if self.check_if_attack_is_valid(picked_square_in_width, picked_square_in_height):
-            return [picked_square_in_width, picked_square_in_height]
+    def place_attack(self, width_position, height_position):
+        if self.check_if_attack_is_valid width_position, height_position):
+            return  width_position, height_position]
         else:
             return [-1, -1]
 
-    def place_ship(self, picked_square_in_width, picked_square_in_height):
-        if self.check_if_move_is_valid(picked_square_in_width, picked_square_in_height):
-            self.ships_position.append([picked_square_in_width, picked_square_in_height])
-            self.current_ship_position.append([picked_square_in_width, picked_square_in_height])
+    def place_ship(self, width_position, height_position):
+        if self.check_if_move_is_valid width_position, height_position):
+            self.ships_position.append( width_position, height_position])
+            self.current_ship_position.append( width_position, height_position])
             self.is_ship_being_placed = True
             self.placed_ships += 1
 
@@ -443,18 +421,18 @@ class Board():
                 if self.placed_ships_figure == len(self.ship_sizes):
                     self.game_phase = 2
 
-    def update_map_from_being_attacked(self, picked_square_in_width, picked_square_in_height):
+    def update_map_from_being_attacked(self, width_position, height_position):
         ship_hit = 0
-        if [picked_square_in_width, picked_square_in_height] in self.ships_position:
-            self.enemy_shoots_hit.append([picked_square_in_width, picked_square_in_height])
+        if  width_position, height_position] in self.ships_position:
+            self.enemy_shoots_hit.append( width_position, height_position])
             ship_hit = 1
         else:
-            self.enemy_shoots_missed.append([picked_square_in_width, picked_square_in_height])
+            self.enemy_shoots_missed.append( width_position, height_position])
 
         if len(Diff(self.enemy_shoots_hit, self.ships_position)) == 0:
             self.game_phase = 4
 
-        return [picked_square_in_width, picked_square_in_height, ship_hit]
+        return  width_position, height_position, ship_hit]
 
     def update_map_from_attack(self, info):
         #Hit
@@ -465,35 +443,35 @@ class Board():
             self.shots_missed_position.append([info[0], info[1]])
 
 
-    def check_if_attack_is_valid(self, picked_square_in_width, picked_square_in_height):
-        if [picked_square_in_width, picked_square_in_height] in self.shots_missed_position or [picked_square_in_width, picked_square_in_height] in self.shots_hit_position:
+    def check_if_attack_is_valid(self, width_position, height_position):
+        if  width_position, height_position] in self.shots_missed_position or  width_position, height_position] in self.shots_hit_position:
             return False
         return True
 
-    def check_if_move_is_valid(self, picked_square_in_width, picked_square_in_height):
+    def check_if_move_is_valid(self, width_position, height_position):
         if self.game_phase == 1:
 
             #Jak jeszcze nie postawiliśmy
             if self.is_ship_being_placed == False:
                 can_place = True
                 for ship in self.ships_position:
-                    if ship[0] == picked_square_in_width - 1 and ship[1] == picked_square_in_height - 1:
+                    if ship[0] == width_position - 1 and ship[1] == height_position - 1:
                         can_place = False
-                    elif ship[0] == picked_square_in_width and ship[1] == picked_square_in_height - 1:
+                    elif ship[0] == width_position and ship[1] == height_position - 1:
                         can_place = False
-                    elif ship[0] == picked_square_in_width + 1 and ship[1] == picked_square_in_height - 1:
+                    elif ship[0] == width_position + 1 and ship[1] == height_position - 1:
                         can_place = False
-                    elif ship[0] == picked_square_in_width - 1 and ship[1] == picked_square_in_height:
+                    elif ship[0] == width_position - 1 and ship[1] == height_position:
                         can_place = False
-                    elif ship[0] == picked_square_in_width and ship[1] == picked_square_in_height:
+                    elif ship[0] == width_position and ship[1] == height_position:
                         can_place = False
-                    elif ship[0] == picked_square_in_width + 1 and ship[1] == picked_square_in_height:
+                    elif ship[0] == width_position + 1 and ship[1] == height_position:
                         can_place = False
-                    elif ship[0] == picked_square_in_width - 1 and ship[1] == picked_square_in_height + 1:
+                    elif ship[0] == width_position - 1 and ship[1] == height_position + 1:
                         can_place = False
-                    elif ship[0] == picked_square_in_width and ship[1] == picked_square_in_height + 1:
+                    elif ship[0] == width_position and ship[1] == height_position + 1:
                         can_place = False
-                    elif ship[0] == picked_square_in_width + 1  and ship[1] == picked_square_in_height + 1:
+                    elif ship[0] == width_position + 1  and ship[1] == height_position + 1:
                         can_place = False
 
             #Jak już postawiliśmy jakiś statek
@@ -507,17 +485,17 @@ class Board():
                     can_place = True
 
                     for ship in self.current_ship_position:
-                        if ship[0] == picked_square_in_width and ship[1] == picked_square_in_height:
+                        if ship[0] == width_position and ship[1] == height_position:
                             can_place = False
-                        elif ship[0] == picked_square_in_width - 1 and ship[1] == picked_square_in_height - 1:
+                        elif ship[0] == width_position - 1 and ship[1] == height_position - 1:
                             can_place = False
-                        elif ship[0] == picked_square_in_width + 1 and ship[1] == picked_square_in_height + 1:
+                        elif ship[0] == width_position + 1 and ship[1] == height_position + 1:
                             can_place = False
-                        elif ship[0] == picked_square_in_width - 1 and ship[1] == picked_square_in_height + 1:
+                        elif ship[0] == width_position - 1 and ship[1] == height_position + 1:
                             can_place = False
-                        elif ship[0] == picked_square_in_width + 1 and ship[1] == picked_square_in_height - 1:
+                        elif ship[0] == width_position + 1 and ship[1] == height_position - 1:
                             can_place = False
-                        elif abs(ship[0] - picked_square_in_width) > 1 or abs(ship[1] - picked_square_in_height) > 1:
+                        elif abs(ship[0] - width_position) > 1 or abs(ship[1] - height_position) > 1:
                             can_place = False
 
                 elif self.placed_ships > 1:
@@ -532,9 +510,9 @@ class Board():
                         higher_ship = self.current_ship_position[self.find_highest_ship()]
 
                         #Pierwszy ship jest nizej od drugiego
-                        if lower_ship[1] - picked_square_in_height == -1 and lower_ship[0] == picked_square_in_width:
+                        if lower_ship[1] - height_position == -1 and lower_ship[0] == width_position:
                             can_place = True
-                        elif higher_ship[1] - picked_square_in_height == 1 and higher_ship[0] == picked_square_in_width:
+                        elif higher_ship[1] - height_position == 1 and higher_ship[0] == width_position:
                             can_place = True
 
                     #Statek jest poziomy
@@ -544,9 +522,9 @@ class Board():
                         right_ship = self.current_ship_position[self.find_right_ship()]
 
                         #Pierwszy ship jest po prawej
-                        if right_ship[0] - picked_square_in_width == -1 and right_ship[1] == picked_square_in_height:
+                        if right_ship[0] - width_position == -1 and right_ship[1] == height_position:
                             can_place = True
-                        elif left_ship[0] - picked_square_in_width == 1 and left_ship[1] == picked_square_in_height:
+                        elif left_ship[0] - width_position == 1 and left_ship[1] == height_position:
                             can_place = True
 
 
@@ -590,33 +568,42 @@ class Board():
                 id = index
         return id
 
+###
+
+def connecting_to_server():
+    screen.fill((0,0,0))
+    font = pygame.font.Font('freesansbold.ttf', 32)
+    text = font.render('ŁĄCZENIE Z SERWEREM', True, (255,255,255), (0,0,0))
+    textRect = text.get_rect()
+    textRect.center = (WIDTH / 2, HEIGHT / 2)
+    screen.blit(text, textRect)
+
+def waiting_for_other_player():
+    screen.fill((0,0,0))
+    font = pygame.font.Font('freesansbold.ttf', 32)
+    text = font.render('CZEKANIE NA GRACZA', True, (255,255,255), (0,0,0))
+    textRect = text.get_rect()
+    textRect.center = (WIDTH / 2, HEIGHT / 2)
+    screen.blit(text, textRect)
+
+### HELPING FUNCTIONS
+
+def Diff(li1, li2):
+    li_dif = [i for i in li1 + li2 if i not in li1 or i not in li2]
+    return li_dif
+
+
+### GAME LOOP
+
+#1. Connecting to server
+#2. Waiting for two players
+#3. Playing
+
+
+
 player1 = Player(0)
 player2 = Player(1)
 
 game = Game(player1, player2)
 game.start_conf()
-
-
-while not done:
-
-    active_player = game.players[game.active_player]
-    game.game_loop()
-
-    for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    done = True
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_DOWN:
-                        active_player.change_picked_square(0, 1)
-                    elif event.key == pygame.K_LEFT:
-                        active_player.change_picked_square(-1, 0)
-                    elif event.key == pygame.K_UP:
-                        active_player.change_picked_square(0, -1)
-                    elif event.key == pygame.K_RIGHT:
-                        active_player.change_picked_square(1, 0)
-                    elif event.key == pygame.K_RETURN:
-                        game.make_action()
-                    elif event.key == pygame.K_SPACE:
-                        game.change_turns()
-
-    pygame.display.flip()
+game.run()
