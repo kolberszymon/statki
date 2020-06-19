@@ -66,6 +66,7 @@ class Game():
         self.player2 = Player(1 - self.net.id, self.canvas, self)
         self.is_player_active = self.set_start_active_state()
         self.game_phase = 1
+        self.first_enter_phase = True
 
     def set_start_active_state(self):
         if self.net.is_player_active == 1:
@@ -119,7 +120,7 @@ class Game():
                     self.change_game_phase(2)
 
             elif self.game_phase == 2:
-                player_num, game_phase = self.parse_data(self.send_data(0))
+                player_num, game_phase = self.parse_data(self.send_ships_data())
 
                 player_num = int(player_num)
                 game_phase = int(game_phase)
@@ -129,6 +130,12 @@ class Game():
 
             elif self.game_phase == 3:
                 #Battle
+
+                current_active_player_num = self.canvas.active_player_num
+                current_active_player_w = self.canvas.active_player_w
+                current_active_player_h = self.canvas.active_player_h
+
+
                 active_player_num, game_phase, returned_action_num, player_width, player_height = self.parse_data(self.send_data(action_num))
 
                 active_player_num = int(active_player_num)
@@ -136,6 +143,13 @@ class Game():
                 returned_action_num = int(returned_action_num)
                 player_width = int(player_width)
                 player_height = int(player_height)
+
+                if active_player_num != current_active_player_num:
+                    if self.first_enter_phase:
+                        self.first_enter_phase = False
+                    else:
+                        self.add_enemy_hit_coords_on_self(current_active_player_w, current_active_player_h)
+
 
                 self.canvas.set_active_player_coords(player_width, player_height)
                 self.set_active_player(active_player_num)
@@ -152,13 +166,29 @@ class Game():
 
 
     def change_turn(self, w, h):
-        active_player_num, game_phase, returned_action_num, player_width, player_height = self.parse_data(self.send_data(1))
+        active_player_num, game_phase, returned_action_num, player_width, player_height, if_shot_hit = self.parse_data(self.send_data(1))
+        self.first_enter_phase = False
+
+
+        if_shot_hit = int(if_shot_hit)
+
+        if if_shot_hit == 1:
+            self.add_hit_cords(player_width, player_height)
+        elif if_shot_hit == 0:
+            self.add_miss_cords(player_width, player_height)
 
         self.set_active_player(active_player_num)
         self.canvas.change_active_player(self.active_player_num())
 
 
+    def add_enemy_hit_coords_on_self(self, w, h):
+        self.canvas.add_enemy_hit_coords_on_self(int(w), int(h))
 
+    def add_hit_cords(self,w,h):
+        self.canvas.hit_succesful(int(w),int(h))
+
+    def add_miss_cords(self, w, h):
+        self.canvas.hit_missed(int(w), int(h))
 
     def change_game_phase(self, game_phase):
         self.game_phase = game_phase
@@ -185,6 +215,21 @@ class Game():
         reply = self.net.send(data)
         print("REPLY:" + reply)
         return reply
+
+
+    def send_ships_data(self):
+        player_num = self.net.id
+        ships = self.player.canvas.get_ships_array()
+        data = ""
+
+        for ship in ships:
+            data += f'{ship[0]} {ship[1]} '
+
+        data += f'{self.net.id}'
+
+        reply = self.net.send(data)
+        return reply
+
 
     @staticmethod
     def parse_data(data):
@@ -246,6 +291,13 @@ class Canvas():
     def draw_background(self):
         self.screen.fill((0, 0, 0))
 
+    def get_ships_array(self):
+        if self.player_id == 0:
+            return self.board1.ships
+        else:
+            return self.board2.ships
+
+
     def get_canvas(self):
         return self
 
@@ -298,8 +350,28 @@ class Canvas():
         if self.player_id == 1:
             self.board1.draw_hits_succesful()
 
+    def draw_enemy_ships_missed(self):
+        if self.player_id == 0:
+            self.board2.draw_hits_missed()
+        if self.player_id == 1:
+            self.board1.draw_hits_missed()
+
+
+    def draw_self_ships_killed(self):
+        if self.player_id == 0:
+            self.board1.draw_enemy_hits_succesful()
+        elif self.player_id == 1:
+            self.board2.draw_enemy_hits_succesful()
+
+    def draw_self_ships_missed(self):
+        if self.player_id == 0:
+            self.board1.draw_enemy_hits_missed()
+        elif self.player_id == 1:
+            self.board2.draw_enemy_hits_missed()
+
     def draw_main_text(self, text):
         self.board1.draw_main_text(text)
+
 
     def draw_all(self):
         if self.game_phase == 1:
@@ -321,6 +393,10 @@ class Canvas():
             self.draw_position_current_player()
             self.draw_boards()
             self.draw_ships()
+            self.draw_enemy_ships_killed()
+            self.draw_enemy_ships_missed()
+            self.draw_self_ships_killed()
+            self.draw_self_ships_missed()
             self.draw_main_text("GRAMY")
 
 
@@ -364,20 +440,23 @@ class Canvas():
             return self.board2.place_attack()
 
     def hit_succesful(self, w, h):
-        if self.active_player_num == 0:
-            self.board1.hit_succesful(w, h)
-            self.board2.enemy_hit_succesful(w, h)
         if self.active_player_num == 1:
+            self.board1.hit_succesful(w, h)
+        if self.active_player_num == 0:
             self.board2.hit_succesful(w, h)
-            self.board1.enemy_hit_succesful(w, h)
 
     def hit_missed(self, w, h):
-        if self.active_player_num == 0:
-            self.board1.hit_missed(w, h)
-            self.board2.enemy_hit_missed(w, h)
         if self.active_player_num == 1:
+            self.board1.hit_missed(w, h)
+        if self.active_player_num == 0:
             self.board2.hit_missed(w, h)
-            self.board1.enemy_hit_missed(w, h)
+
+    def add_enemy_hit_coords_on_self(self, w, h):
+        if self.player_id == 0:
+            self.board1.add_enemy_hit_coords_on_self(w, h)
+        elif self.player_id == 1:
+            self.board2.add_enemy_hit_coords_on_self(w, h)
+
 
 class Board():
 
@@ -412,17 +491,24 @@ class Board():
         self.enemy_hit_position = []
         self.enemy_missed_position = []
 
+
+    def add_enemy_hit_coords_on_self(self, w, h):
+        if [w, h] in self.ships:
+            self.enemy_hit_position.append([w, h])
+        else:
+            self.enemy_missed_position.append([w, h])
+
     def hit_succesful(self, w, h):
-        self.shots_hit_position.append(w, h)
+        self.shots_hit_position.append([w, h])
 
     def hit_missed(self, w, h):
-        self.shots_missed_position.append(w, h)
+        self.shots_missed_position.append([w, h])
 
     def enemy_hit_succesful(self, w, h):
-        self.enemy_hit_position.append(w, h)
+        self.enemy_hit_position.append([w, h])
 
     def enemy_hit_missed(self, w, h):
-        self.enemy_missed_position.append(w, h)
+        self.enemy_missed_position.append([w, h])
 
     def check_if_hit(self, w, h):
         if [w, h] in self.ships:
@@ -495,6 +581,7 @@ class Board():
                     if item[0] == w and item[1] == h:
                         self.draw_item_on_map(img, w, h)
 
+
     def draw_item_on_map(self, img, w, h):
 
         square_x_pos = 50 + ( (WIDTH / 2) * self.board_num ) + (22 * (w)) + (self.spacing_between * (w))
@@ -511,6 +598,14 @@ class Board():
     def draw_hits_succesful(self):
         self.draw_icons_on_map(shipKilled, self.shots_hit_position)
 
+    def draw_hits_missed(self):
+        self.draw_icons_on_map(missedShot, self.shots_missed_position)
+
+    def draw_enemy_hits_succesful(self):
+        self.draw_icons_on_map(shipKilled, self.enemy_hit_position)
+
+    def draw_enemy_hits_missed(self):
+        self.draw_icons_on_map(missedShot, self.enemy_missed_position)
 
     def draw_main_text(self, text):
         font = pygame.font.Font('freesansbold.ttf', 32)
@@ -564,8 +659,16 @@ class Board():
 
 
     def check_if_attack_is_valid(self):
-        if [self.player_w, self.player_h] in self.shots_missed_position or [self.player_w, self.player_h] in self.shots_hit_position:
+        if [self.player_w, self.player_h] in self.shots_hit_position or [self.player_w, self.player_h] in self.shots_missed_position:
+            print("not valid")
             return False
+        print("valid")
+        print(f'shots_missed_position: {self.shots_missed_position}')
+        print(f'shots_hit_position: {self.shots_hit_position}')
+        print(f'enemy_hit_position: {self.enemy_hit_position}')
+        print(f'enemy_missed_position: {self.enemy_missed_position}')
+
+
         return True
 
     def check_if_ship_place_is_valid(self):
