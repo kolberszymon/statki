@@ -33,6 +33,7 @@ GAME_PHASES = [0, 0]
 active_player_num = 1
 checking_move = 0
 global_action_num = 0
+LOSER_ID = 0
 
 player1_ship_array = []
 player2_ship_array = []
@@ -99,7 +100,7 @@ def threaded_client(conn):
                 elif game_phase == 3:
 
                     if action_num == -1:
-                        reply = f'{active_player_num}:{game_phase}:{action_num}:{current_player_width}:{current_player_height}'
+                        reply = f'{active_player_num}:{GAME_PHASES[player_num]}:{action_num}:{current_player_width}:{current_player_height}'
 
                     #Aktywny gracz sie rusza
                     if action_num == 0:
@@ -132,8 +133,17 @@ def threaded_client(conn):
 
                         reply = f'{active_player_num}:{game_phase}:{action_num}:{current_player_width}:{current_player_height}:{if_shot_hit}'
 
+                    if action_num == 4:
+                        GAME_PHASES[0] = 4
+                        GAME_PHASES[1] = 4
+                        game_phase = 4
+
+                        reply = f'{player_num}:{4}'
+
                 elif game_phase == 4:
-                    pass
+                    print("444444444444445454545454")
+                    LOSER_ID = player_num
+                    reply = f'{LOSER_ID}:{4}'
 
 
                 print("Sending: " + reply)

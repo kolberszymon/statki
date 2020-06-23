@@ -33,3 +33,13 @@ def find_left_ship(array):
             min = ship[0]
             id = index
     return id
+
+def check_if_arrays_are_equal(array1, array2):
+    longer_array = array1 if len(array1) > len(array2) else array2
+
+    same = True
+    for coords in longer_array:
+        if coords not in array2:
+            same = False
+
+    return same

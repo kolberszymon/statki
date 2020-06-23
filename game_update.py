@@ -1,11 +1,12 @@
 import socket
 import pygame
 from network import Network
-from utilities import find_left_ship, find_right_ship, find_lowest_ship, find_highest_ship
+from utilities import find_left_ship, find_right_ship, find_lowest_ship, find_highest_ship, check_if_arrays_are_equal
 
 WIDTH = 750
 HEIGHT = 390
 
+GAME_IS_ON = True
 
 ########### Images
 
@@ -54,7 +55,6 @@ class Player():
     def place_attack(self):
         result = self.canvas.place_attack()
         if result != [-1, -1]:
-            #self.game.check_if_hit(result[0], result[1])
             self.game.change_turn(result[0], result[1])
 
 class Game():
@@ -130,40 +130,56 @@ class Game():
 
             elif self.game_phase == 3:
                 #Battle
+                global GAME_IS_ON
 
                 current_active_player_num = self.canvas.active_player_num
                 current_active_player_w = self.canvas.active_player_w
                 current_active_player_h = self.canvas.active_player_h
 
+                if GAME_IS_ON == False:
+                    player_num, game_phase = self.parse_data(self.send_data(4))
 
-                active_player_num, game_phase, returned_action_num, player_width, player_height = self.parse_data(self.send_data(action_num))
+                    player_num = int(player_num)
+                    game_phase = int(game_phase)
 
-                active_player_num = int(active_player_num)
+                    self.change_game_phase(4)
+
+                else:
+                    active_player_num, game_phase, returned_action_num, player_width, player_height = self.parse_data(self.send_data(action_num))
+
+                    active_player_num = int(active_player_num)
+                    game_phase = int(game_phase)
+                    returned_action_num = int(returned_action_num)
+                    player_width = int(player_width)
+                    player_height = int(player_height)
+
+                    if active_player_num != current_active_player_num:
+                        if self.first_enter_phase:
+                            self.first_enter_phase = False
+                        else:
+                            self.add_enemy_hit_coords_on_self(current_active_player_w, current_active_player_h)
+                            self.canvas.check_if_lost()
+
+                    if game_phase == 4:
+                        GAME_IS_ON = False
+
+                        self.change_game_phase(4)
+
+                    self.canvas.set_active_player_coords(player_width, player_height)
+                    self.set_active_player(active_player_num)
+
+            elif self.game_phase == 4:
+                loser_id, game_phase = self.parse_data(self.send_data(4))
+
+                loser_id = int(loser_id)
                 game_phase = int(game_phase)
-                returned_action_num = int(returned_action_num)
-                player_width = int(player_width)
-                player_height = int(player_height)
 
-                if active_player_num != current_active_player_num:
-                    if self.first_enter_phase:
-                        self.first_enter_phase = False
-                    else:
-                        self.add_enemy_hit_coords_on_self(current_active_player_w, current_active_player_h)
-
-
-                self.canvas.set_active_player_coords(player_width, player_height)
-                self.set_active_player(active_player_num)
-
+                self.canvas.loser_id = loser_id
 
 
 
             self.canvas.change_active_player(self.active_player_num())
             self.canvas.update()
-
-    def check_if_hit(self, w, h):
-        active_player_num, game_phase, returned_action_num, player_width, player_height = self.parse_data(self.send_data(2))
-
-
 
     def change_turn(self, w, h):
         active_player_num, game_phase, returned_action_num, player_width, player_height, if_shot_hit = self.parse_data(self.send_data(1))
@@ -207,13 +223,10 @@ class Game():
         player_num, w, h = self.active_player_info()
         data = ""
         if self.is_player_active == 0:
-            print("Nieaktywny")
             data = f'{player_num}:{self.game_phase}:-1:{w}:{h}'
         else:
-            print("Aktywny")
             data = f'{player_num}:{self.game_phase}:{action}:{w}:{h}'
         reply = self.net.send(data)
-        print("REPLY:" + reply)
         return reply
 
 
@@ -278,6 +291,7 @@ class Canvas():
         self.player_id = player_id
         self.active_player_w = 0
         self.active_player_h = 0
+        self.loser_id = 0
         pygame.display.set_caption(name)
 
 
@@ -399,6 +413,22 @@ class Canvas():
             self.draw_self_ships_missed()
             self.draw_main_text("GRAMY")
 
+        elif self.game_phase == 4:
+            self.draw_background()
+            self.draw_position_current_player()
+            self.draw_boards()
+            self.draw_ships()
+            self.draw_enemy_ships_killed()
+            self.draw_enemy_ships_missed()
+            self.draw_self_ships_killed()
+            self.draw_self_ships_missed()
+            self.draw_main_text(f'PRZEGRYWA GRACZ {self.loser_id}')
+
+    def check_if_lost(self):
+        if self.active_player_num == 1:
+            self.board1.check_if_lost()
+        elif self.active_player_num == 0:
+            self.board2.check_if_lost()
 
     def first_phase_ended(self):
         if self.active_player_num == 0:
@@ -416,12 +446,6 @@ class Canvas():
             self.board1.change_player_position(w, h)
         if self.active_player_num == 1:
             self.board2.change_player_position(w, h)
-
-    def check_if_hit(self, w, h):
-        if self.player_id == 0:
-            return self.board1.check_if_hit(w, h)
-        elif self.player_id == 1:
-            return self.board2.check_if_hit(w, h)
 
     def set_active_player_coords(self, w, h):
         self.active_player_w = w
@@ -492,6 +516,15 @@ class Board():
         self.enemy_missed_position = []
 
 
+    def check_if_lost(self):
+        global GAME_IS_ON
+        print(self.ships)
+        print(self.enemy_hit_position)
+        if check_if_arrays_are_equal(self.ships, self.enemy_hit_position):
+            GAME_IS_ON = False
+            return True
+        return False
+
     def add_enemy_hit_coords_on_self(self, w, h):
         if [w, h] in self.ships:
             self.enemy_hit_position.append([w, h])
@@ -509,13 +542,6 @@ class Board():
 
     def enemy_hit_missed(self, w, h):
         self.enemy_missed_position.append([w, h])
-
-    def check_if_hit(self, w, h):
-        if [w, h] in self.ships:
-            return True
-        else:
-            return False
-
 
     def change_player_position(self, w, h):
         self.player_w = w
@@ -656,18 +682,13 @@ class Board():
                 return color_green
             else:
                 return color_red
+        elif self.game_phase == 4:
+            return color_red
 
 
     def check_if_attack_is_valid(self):
         if [self.player_w, self.player_h] in self.shots_hit_position or [self.player_w, self.player_h] in self.shots_missed_position:
-            print("not valid")
             return False
-        print("valid")
-        print(f'shots_missed_position: {self.shots_missed_position}')
-        print(f'shots_hit_position: {self.shots_hit_position}')
-        print(f'enemy_hit_position: {self.enemy_hit_position}')
-        print(f'enemy_missed_position: {self.enemy_missed_position}')
-
 
         return True
 
