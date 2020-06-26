@@ -59,8 +59,8 @@ class Player():
 
 class Game():
 
-    def __init__(self):
-        self.net = Network()
+    def __init__(self, ip, p):
+        self.net = Network(ip, p)
         self.canvas = Canvas(WIDTH, HEIGHT, "Stateczki", self.net.id)
         self.player = Player(self.net.id, self.canvas, self)
         self.player2 = Player(1 - self.net.id, self.canvas, self)

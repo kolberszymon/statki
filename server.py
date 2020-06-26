@@ -1,11 +1,19 @@
+import argparse
 import socket
 from _thread import *
 import sys
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-ip', help='Adres IP serwera (domyślnie 127.0.0.1)', type=str, default='127.0.0.1', required=False)
+parser.add_argument('-p', '--port', help='Port serwera (domyślnie 64000)', type=int, default=64000, required=False)
+
+args = parser.parse_args()
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-HOST = '127.0.0.1'
-PORT = 64000
+HOST = args.ip
+PORT = args.port
+
 
 #FORMAT
 #PLAYER_ID:GAME_PHASE:ACTION:POSITION_WIDTH:POSITION_HEIGHT
@@ -21,7 +29,7 @@ try:
 except socket.error as e:
     print(str(e))
 
-server_socket.listen(2)
+server_socket.listen(5)
 print("Waiting for connection")
 
 currentId = 0

@@ -2,10 +2,13 @@ import socket
 
 class Network:
 
-    def __init__(self):
+    host = ''
+    port = 0
+
+    def __init__(self, ip, p):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.host = '127.0.0.1'
-        self.port = 64000
+        self.host = ip
+        self.port = p
         self.addr = (self.host, self.port)
         self.id, self.is_player_active = self.connect()
 
